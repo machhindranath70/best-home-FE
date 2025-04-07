@@ -4,26 +4,91 @@
   <meta charset="utf-8" />
   <title>Leaflet Map</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Geocoder plugin CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
   <style>
     html, body, #map {
       height: 100%;
       margin: 0;
+      padding: 0;
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 6px 12px;
+      font-size: 14px;
+      z-index: 1000;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="info">Click on map or search to drop a marker 🔽</div>
+
   <script>
-    var map = L.map('map').setView([17.385044, 78.486671], 13); // Default: Hyderabad
+    var map = L.map('map').setView([17.385044, 78.486671], 13);
+    var marker;
+
+    // 🌍 Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
-    L.marker([17.385044, 78.486671]).addTo(map).bindPopup('Hello from Hyderabad!');
+
+    // ✅ Listen for coordinates sent from Flutter
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'move_to_location') {
+        const lat = event.data.lat;
+        const lon = event.data.lon;
+
+        map.setView([lat, lon], 15);
+
+        if (marker) {
+          marker.setLatLng([lat, lon]);
+        } else {
+          marker = L.marker([lat, lon]).addTo(map).bindPopup("Searched Location").openPopup();
+        }
+      }
+    });
+      // 🟢 Add multiple markers from result
+      
+    // 📍 Auto locate user
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        var lat = position.coords.latitude;
+        var lon = position.coords.longitude;
+        map.setView([lat, lon], 14);
+
+        // 🔁 Send to Flutter
+        window.parent.postMessage({ type: 'user_location', lat: lat, lon: lon }, "*");
+      });
+    }
+
+    // ✨ Marker on click
+    map.on('click', function(e) {
+      if (marker) {
+        marker.setLatLng(e.latlng);
+      } else {
+        marker = L.marker(e.latlng).addTo(map).bindPopup("Selected Point").openPopup();
+      }
+
+      // 🔁 Send click point to Flutter
+      window.parent.postMessage({
+        type: 'selected_point',
+        lat: e.latlng.lat,
+        lon: e.latlng.lng
+      }, "*");
+    });
   </script>
 </body>
 </html>

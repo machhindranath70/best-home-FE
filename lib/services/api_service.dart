@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl = 'https://best-home-be-1.onrender.com/api'; // ✅ Your live backend
+  static const String baseUrl =
+      'https://best-home-be-2.onrender.com/api'; // ✅ Your live backend
 
   static Future<bool> submitRegistration(Map<String, dynamic> data) async {
     final url = Uri.parse('$baseUrl/register/');
@@ -22,7 +23,9 @@ class ApiService {
   }
 
   static Future<List<dynamic>> fetchRegistrations() async {
-    final url = Uri.parse('$baseUrl/registrations/'); // You need to implement this in Django
+    final url = Uri.parse(
+      '$baseUrl/registrations/',
+    ); // You need to implement this in Django
 
     try {
       final response = await http.get(url);

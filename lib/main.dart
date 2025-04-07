@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'screens/registration_page.dart';
 import 'dart:convert';
-import 'screens/home_page.dart';
+// import 'screens/home_page.dart';
+import 'screens/map_page.dart'; // <-- add this line
 
 void main() {
   runApp(const MyApp());
 }
-
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key}); // ✅ add const here
@@ -18,7 +17,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Best Home App',
       theme: ThemeData(primarySwatch: Colors.teal),
-      home: const HomePage(), // ✅ Correct: Show HomePage here
+      home: const MapPage(), // ✅ Correct: Show HomePage here
       debugShowCheckedModeBanner: false,
     );
   }
@@ -42,7 +41,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
   bool isSubmitting = false;
 
   Future<void> submitForm() async {
-    final url = Uri.parse('http://127.0.0.1:8000/api/register/'); // Replace if needed
+    final url = Uri.parse(
+      'https://best-home-be-2.onrender.com/api/register/',
+    ); // Replace if needed
 
     setState(() => isSubmitting = true);
 
@@ -61,14 +62,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
     setState(() => isSubmitting = false);
 
     if (response.statusCode == 201) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ Registered Successfully')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('✅ Registered Successfully')));
       _formKey.currentState?.reset();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error: ${response.body}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Error: ${response.body}')));
     }
   }
 
@@ -80,49 +81,54 @@ class _RegistrationPageState extends State<RegistrationPage> {
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: ListView(children: [
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Name'),
-              onChanged: (val) => name = val,
-              validator: (val) => val!.isEmpty ? 'Enter name' : null,
-            ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Contact'),
-              onChanged: (val) => contact = val,
-              validator: (val) => val!.isEmpty ? 'Enter contact' : null,
-            ),
-            DropdownButtonFormField<String>(
-              value: propertyType,
-              decoration: InputDecoration(labelText: 'Property Type'),
-              items: ['house', 'apartment', 'land'].map((type) {
-                return DropdownMenuItem(value: type, child: Text(type));
-              }).toList(),
-              onChanged: (val) => setState(() => propertyType = val!),
-            ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Property Name'),
-              onChanged: (val) => propertyName = val,
-              validator: (val) => val!.isEmpty ? 'Enter property name' : null,
-            ),
-            TextFormField(
-              decoration: InputDecoration(labelText: 'Address'),
-              onChanged: (val) => address = val,
-              validator: (val) => val!.isEmpty ? 'Enter address' : null,
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: isSubmitting
-                  ? null
-                  : () {
-                      if (_formKey.currentState!.validate()) {
-                        submitForm();
-                      }
-                    },
-              child: isSubmitting
-                  ? CircularProgressIndicator(color: Colors.white)
-                  : Text('Submit'),
-            ),
-          ]),
+          child: ListView(
+            children: [
+              TextFormField(
+                decoration: InputDecoration(labelText: 'Name'),
+                onChanged: (val) => name = val,
+                validator: (val) => val!.isEmpty ? 'Enter name' : null,
+              ),
+              TextFormField(
+                decoration: InputDecoration(labelText: 'Contact'),
+                onChanged: (val) => contact = val,
+                validator: (val) => val!.isEmpty ? 'Enter contact' : null,
+              ),
+              DropdownButtonFormField<String>(
+                value: propertyType,
+                decoration: InputDecoration(labelText: 'Property Type'),
+                items:
+                    ['house', 'apartment', 'land'].map((type) {
+                      return DropdownMenuItem(value: type, child: Text(type));
+                    }).toList(),
+                onChanged: (val) => setState(() => propertyType = val!),
+              ),
+              TextFormField(
+                decoration: InputDecoration(labelText: 'Property Name'),
+                onChanged: (val) => propertyName = val,
+                validator: (val) => val!.isEmpty ? 'Enter property name' : null,
+              ),
+              TextFormField(
+                decoration: InputDecoration(labelText: 'Address'),
+                onChanged: (val) => address = val,
+                validator: (val) => val!.isEmpty ? 'Enter address' : null,
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed:
+                    isSubmitting
+                        ? null
+                        : () {
+                          if (_formKey.currentState!.validate()) {
+                            submitForm();
+                          }
+                        },
+                child:
+                    isSubmitting
+                        ? CircularProgressIndicator(color: Colors.white)
+                        : Text('Submit'),
+              ),
+            ],
+          ),
         ),
       ),
     );
