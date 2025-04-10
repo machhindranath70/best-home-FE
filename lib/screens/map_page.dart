@@ -9,11 +9,16 @@ import 'map/map_header.dart';
 import 'map/map_view.dart';
 import 'map/result_card.dart';
 import 'map/result_grid.dart';
+import 'package:flutter/foundation.dart'; // for kIsWeb
+import '../utils/web_iframe_util.dart';   // your web-safe iframe utility
+import 'dart:html' as html;
+
+import 'package:flutter/foundation.dart'; // For kIsWeb
 
 bool isLoading = false;
 
 final TextEditingController radiusController = TextEditingController(
-  text: '5000',
+  text: '1000',
 );
 final TextEditingController searchController =
     TextEditingController(); // ✅ Added
@@ -135,7 +140,7 @@ class _MapPageState extends State<MapPage> {
       final data = event.data;
       if (data is Map) {
         if (data['type'] == 'user_location') {
-          _fetchNearbyProperties(data['lat'], data['lon'], radius ?? 5000);
+          _fetchNearbyProperties(data['lat'], data['lon'], radius ?? 1000);
         }
         if (data['type'] == 'selected_point') {
           setState(() {
@@ -207,10 +212,29 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
+
+
   void _handleFindHome() {
     final input = double.tryParse(radiusController.text);
     if (selectedLat != null && selectedLon != null && input != null) {
       setState(() => radius = input);
+
+      // ✅ Only run iframe communication on Web
+      if (kIsWeb) {
+        final iframe = html.document.getElementById('leaflet-map') as html.IFrameElement?;
+        iframe?.contentWindow?.postMessage({
+          'type': 'set_radius',
+          'radius': input,
+        }, '*');
+
+        iframe?.contentWindow?.postMessage({
+          'type': 'move_to_location',
+          'lat': selectedLat,
+          'lon': selectedLon,
+        }, '*');
+      }
+
+      _fetchNearbyProperties(selectedLat!, selectedLon!, input);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -220,7 +244,8 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  //_fetchNearbyProperties(selectedLat!, selectedLon!, input);
+
+ //_fetchNearbyProperties(selectedLat!, selectedLon!, input);
   @override
   Widget build(BuildContext context) {
     return Scaffold(

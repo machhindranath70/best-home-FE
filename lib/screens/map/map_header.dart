@@ -92,7 +92,7 @@ class MapHeader extends StatelessWidget {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    hintText: "e.g. 5000",
+                    hintText: "e.g. 1000",
                     hintStyle: const TextStyle(color: Colors.teal),
                   ),
                 ),

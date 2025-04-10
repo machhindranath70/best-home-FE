@@ -4,8 +4,29 @@ import 'screens/registration_page.dart';
 import 'dart:convert';
 // import 'screens/home_page.dart';
 import 'screens/map_page.dart'; // <-- add this line
+import 'dart:html' as html;        // 👈 Add this
+import 'dart:ui' as ui;            // 👈 And this
+
+
+
+void registerMapIframe() {
+  // ignore: undefined_prefixed_name
+  ui.platformViewRegistry.registerViewFactory(
+    'map-iframe', // This viewType is used in HtmlElementView
+    (int viewId) {
+      final iframe = html.IFrameElement()
+        ..src = 'assets/map.html'
+        ..id = 'leaflet-map' // 👈 This ID is used in getElementById
+        ..style.border = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%';
+      return iframe;
+    },
+  );
+}
 
 void main() {
+  registerMapIframe(); 
   runApp(const MyApp());
 }
 

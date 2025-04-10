@@ -39,13 +39,15 @@
   <script>
     var map = L.map('map').setView([17.385044, 78.486671], 13);
     var marker;
+    var bufferCircle;
+    var selectedRadius = 5000; // Default to 5km
 
     // 🌍 Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // ✅ Listen for coordinates sent from Flutter
+    // ✅ Receive radius and coordinates from Flutter
     window.addEventListener('message', function(event) {
       if (event.data && event.data.type === 'move_to_location') {
         const lat = event.data.lat;
@@ -58,10 +60,17 @@
         } else {
           marker = L.marker([lat, lon]).addTo(map).bindPopup("Searched Location").openPopup();
         }
+
+        // Draw buffer if radius is available
+        drawBufferCircle(lat, lon);
+      }
+
+      if (event.data && event.data.type === 'set_radius') {
+        selectedRadius = event.data.radius;
+        console.log("✅ Radius updated to: " + selectedRadius + " meters");
       }
     });
-      // 🟢 Add multiple markers from result
-      
+
     // 📍 Auto locate user
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(function(position) {
@@ -74,21 +83,41 @@
       });
     }
 
-    // ✨ Marker on click
+    // ✨ Click on map
     map.on('click', function(e) {
+      const lat = e.latlng.lat;
+      const lon = e.latlng.lng;
+
       if (marker) {
-        marker.setLatLng(e.latlng);
+        marker.setLatLng([lat, lon]);
       } else {
-        marker = L.marker(e.latlng).addTo(map).bindPopup("Selected Point").openPopup();
+        marker = L.marker([lat, lon]).addTo(map).bindPopup("Selected Point").openPopup();
       }
 
-      // 🔁 Send click point to Flutter
+      // 🔁 Send clicked point to Flutter
       window.parent.postMessage({
         type: 'selected_point',
-        lat: e.latlng.lat,
-        lon: e.latlng.lng
+        lat: lat,
+        lon: lon
       }, "*");
+
+      // 🟢 Draw buffer circle
+      drawBufferCircle(lat, lon);
     });
+
+    // 🌀 Buffer circle drawer
+    function drawBufferCircle(lat, lon) {
+      if (bufferCircle) {
+        map.removeLayer(bufferCircle);
+      }
+
+      bufferCircle = L.circle([lat, lon], {
+        radius: selectedRadius,
+        color: 'blue',
+        fillColor: '#3399ff',
+        fillOpacity: 0.3
+      }).addTo(map);
+    }
   </script>
 </body>
 </html>
