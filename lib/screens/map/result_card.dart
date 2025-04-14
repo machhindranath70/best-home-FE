@@ -163,6 +163,31 @@ class ResultCard extends StatelessWidget {
                           );
                         }),
                       ),
+                      if (item.containsKey('distance') && item.containsKey('rating')) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on, size: 18, color: Colors.grey),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Distance: ${(item['distance'] / 1000).toStringAsFixed(2)} km',
+                              style: const TextStyle(fontSize: 14, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.star, size: 18, color: Colors.amber),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Rating: ${item['rating']}',
+                              style: const TextStyle(fontSize: 14, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ],
+
                     ],
                   ),
                 ),

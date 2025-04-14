@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'dart:html' as html;
-
 import 'registration_page.dart';
 import 'map/map_header.dart';
 import 'map/map_view.dart';
@@ -12,11 +11,14 @@ import 'map/result_grid.dart';
 import 'package:flutter/foundation.dart'; // for kIsWeb
 import '../utils/web_iframe_util.dart';   // your web-safe iframe utility
 import 'dart:html' as html;
+import 'RetryableNetworkImage.dart';
+import 'map/footer.dart';
+
 
 import 'package:flutter/foundation.dart'; // For kIsWeb
 
 bool isLoading = false;
-
+bool isMarkerSelected = false;
 final TextEditingController radiusController = TextEditingController(
   text: '1000',
 );
@@ -30,17 +32,52 @@ class MapPage extends StatefulWidget {
   State<MapPage> createState() => _MapPageState();
 }
 
+
+
 class _MapPageState extends State<MapPage> {
   double? radius = 1000;
   double? selectedLat;
   double? selectedLon;
   List<dynamic> searchResults = [];
 
+
   @override
   void initState() {
     super.initState();
     _listenToMapEvents();
   }
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  return Geolocator.distanceBetween(lat1, lon1, lat2, lon2); // in meters
+  }
+
+
+
+  Map<String, dynamic>? getBestRecommendedHome() {
+    if (selectedLat == null || selectedLon == null || searchResults.isEmpty) return null;
+
+    List<Map<String, dynamic>> enriched = searchResults.cast<Map<String, dynamic>>().map((item) {
+      final lat = item['latitude'];
+      final lon = item['longitude'];
+      final rating = double.tryParse(item['rating']?.toString() ?? '0') ?? 0.0;
+      final distance = _calculateDistance(selectedLat!, selectedLon!, lat, lon);
+
+      return {
+        ...item,
+        'distance': distance,
+        'rating': rating,
+      };
+    }).toList();
+
+    enriched.sort((a, b) {
+      final distCompare = a['distance'].compareTo(b['distance']);
+      return distCompare != 0
+          ? distCompare
+          : b['rating'].compareTo(a['rating']); // prefer higher rating if distance equal
+    });
+
+    return enriched.first;
+  }
+
 
   void _showAutoDismissDialog(String title, String message) {
     showDialog(
@@ -92,7 +129,7 @@ class _MapPageState extends State<MapPage> {
           ),
     );
 
-    Future.delayed(const Duration(seconds: 5), () {
+    Future.delayed(const Duration(seconds: 3), () {
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
@@ -146,7 +183,24 @@ class _MapPageState extends State<MapPage> {
           setState(() {
             selectedLat = data['lat'];
             selectedLon = data['lon'];
+            _handleFindHome();
           });
+        }
+        if (data['type'] == 'marker_clicked') {
+          // final property = data['property'];
+          final rawProperty = data['property'];
+
+          if (rawProperty != null && rawProperty is Map) {
+            final property = Map<String, dynamic>.from(rawProperty);
+
+            setState(() {
+              isMarkerSelected = true; // ✅ mark this as user-selected
+              searchResults = [property];
+              selectedLat = (property['latitude'] ?? 0).toDouble();
+              selectedLon = (property['longitude'] ?? 0).toDouble();
+            });
+          }
+
         }
       }
     });
@@ -160,6 +214,7 @@ class _MapPageState extends State<MapPage> {
                 'lat': e['latitude'],
                 'lon': e['longitude'],
                 'name': e['name'],
+                'property': e, // ✅ send full property
               },
             )
             .toList();
@@ -217,7 +272,10 @@ class _MapPageState extends State<MapPage> {
   void _handleFindHome() {
     final input = double.tryParse(radiusController.text);
     if (selectedLat != null && selectedLon != null && input != null) {
-      setState(() => radius = input);
+      setState(()  {
+          radius = input;
+          isMarkerSelected = false; // ✅ reset when using Find Home
+        });
 
       // ✅ Only run iframe communication on Web
       if (kIsWeb) {
@@ -251,9 +309,10 @@ class _MapPageState extends State<MapPage> {
     return Scaffold(
       body: Column(
         children: [
+          // 🔼 Top Header
           MapHeader(
             radiusController: radiusController,
-            searchController: searchController, // ✅ Pass search controller
+            searchController: searchController,
             onFindTap: _handleFindHome,
             onRegisterTap: () {
               Navigator.push(
@@ -261,40 +320,241 @@ class _MapPageState extends State<MapPage> {
                 MaterialPageRoute(builder: (_) => const RegistrationPage()),
               );
             },
-            onSearch: _searchPlace, // ✅ Hook search function
+            onSearch: _searchPlace,
           ),
+
+          // 🔁 Main Content
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  const SizedBox(height: 10),
-                  const MapView(),
+                  // 🌍 Map + Recommendation Side-by-Side
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 🗺️ Map (70%)
+                      Expanded(
+                        flex: 7,
+                        child: const MapView(),
+                      ),
+
+                      // 🏠 Best Recommendation (30%)
+                      Expanded(
+                        flex: 3,
+                        child: Container(
+                          height: 500,
+                          padding: const EdgeInsets.all(12),
+                          color: const Color.fromARGB(255, 254, 255, 255),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 500),
+                            child: getBestRecommendedHome() == null
+                                ? Column(
+                                    key: const ValueKey('placeholder'),
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text(
+                                        '',
+                                        style: TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color.fromARGB(255, 250, 191, 65),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      AnimatedDefaultTextStyle(
+                                        duration: const Duration(milliseconds: 400),
+                                        style: const TextStyle(
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.teal,
+                                        ),
+                                        child: const Text('Select your location'),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      AnimatedDefaultTextStyle(
+                                        duration: const Duration(milliseconds: 400),
+                                        style: const TextStyle(
+                                          fontSize: 36,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color.fromARGB(255, 1, 41, 61),
+                                        ),
+                                        child: const Text('Find Your Best Home'),
+                                      ),
+                                      const SizedBox(height: 24),
+                                      Image.asset(
+                                        'assets/icons8-search.gif',
+                                        width: 90,
+                                        height: 90,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ],
+                                  )
+                                : Column(
+                                    key: const ValueKey('card'),
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                      isMarkerSelected ? 'Your Selected Property' : 'Best Recommendation for You',
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.teal,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: RetryableNetworkImage(
+                                          imageUrl: getBestRecommendedHome()?['photo'] ?? '',
+                                          height: 150,
+                                          width: double.infinity,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Image.asset(
+                                              'assets/10751558.png',
+                                              height: 150,
+                                              width: double.infinity,
+                                              fit: BoxFit.cover,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        getBestRecommendedHome()?['name'] ?? 'Unknown Property',
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Icon(Icons.location_on, size: 18, color: Colors.grey),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              getBestRecommendedHome()?['full_address'] ?? 'No address',
+                                              style: const TextStyle(fontSize: 14, color: Colors.black54),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.phone, size: 18, color: Colors.grey),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            getBestRecommendedHome()?['phone'] ?? 'N/A',
+                                            style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.star, size: 18, color: Colors.amber),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Rating: ${getBestRecommendedHome()?['rating'] ?? 'N/A'}',
+                                            style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.directions_walk, size: 18, color: Colors.blueGrey),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Distance: ${(getBestRecommendedHome()?['distance'] / 1000).toStringAsFixed(2)} km',
+                                            style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Builder(
+                                        builder: (_) {
+                                          final reviewLink = getBestRecommendedHome()?['reviews_link']?.toString();
+                                          if (reviewLink != null && reviewLink.startsWith('http')) {
+                                            return Center( // 👉 Center the button
+                                              child: TextButton.icon(
+                                                onPressed: () {
+                                                  html.window.open(reviewLink, '_blank');
+                                                },
+                                                icon: const Icon(Icons.reviews),
+                                                label: const Text('Open Reviews'),
+                                                style: TextButton.styleFrom(
+                                                  foregroundColor: Colors.white,
+                                                  backgroundColor: Colors.teal,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                          return const SizedBox.shrink();
+                                        },
+                                      ),
+
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // 🔽 Full-width Result Grid (as it was before)
                   if (isLoading)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
                       child: CircularProgressIndicator(),
                     ),
-                  if (searchResults.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: Column(
-                        children: [
-                          const Text(
-                            '🏘️ Nearby Homes',
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          height: 50,
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.shade100,
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Text(
+                            '🏘️ Nearby Houses for Accommodation',
                             style: TextStyle(
-                              fontSize: 20,
+                              fontSize: 24,
                               fontWeight: FontWeight.bold,
+                              color: Color.fromARGB(255, 5, 126, 226),
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          ResultGrid(
-                            results: searchResults.cast<Map<String, dynamic>>(),
-                          ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 10),
+                        ResultGrid(
+                          results: searchResults.cast<Map<String, dynamic>>(),
+                        ),
+                      ],
                     ),
+                  ),
+                  const Footer(), // 👈 Add this here
                 ],
-              ),
+               ),
             ),
           ),
         ],

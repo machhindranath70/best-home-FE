@@ -62,7 +62,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/map.html
-    - assets/10751558.png 
+    - assets/10751558.png
+    - assets/icons8-search.gif 
+    - assets/home marker.png
+    - assets/logo_cote.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
